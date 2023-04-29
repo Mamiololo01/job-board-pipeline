@@ -1,0 +1,6 @@
+project:
+  name: 10alytics-job-pipeline
+postgres:
+  port: 5435
+# webserver:
+#   port: 8081

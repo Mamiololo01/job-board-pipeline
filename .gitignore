@@ -1,0 +1,40 @@
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Serverless directories
+.serverless
+
+*.json
+extract/
+transformed/
+.env
+__pycache__/
+.serverless
+txt
+*.csv
+!package.json
+node_modules/
+
+.env
+.DS_Store # macOS specific ignore
+airflow_settings.yaml
+__pycache__/
+astro
+
+plugins/
+tests/

@@ -1,0 +1,17 @@
+astro
+.git
+.env.example
+airflow_settings.yaml
+logs/
+handlers/
+main.py
+node_modules/
+serverless.yml
+extract/
+transformed/
+.serverless/
+__pycache__/
+**/__pycache__/
+*.json
+*.csv
+!raw_jobs_data.json
