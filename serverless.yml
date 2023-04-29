@@ -1,0 +1,67 @@
+
+
+service: jobs-data-pipeline
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.7
+  timeout: 30
+  memorySize: 2048
+  iam:
+    role:
+      name: job-pipeline-role
+      statements:
+        - Effect: Allow
+          Action: 
+            - 's3:GetObject'
+            - 's3:PutObject'
+          Resource:
+            - 'arn:aws:s3:::${env:RAW_DATA_BUCKET}/*'
+            - 'arn:aws:s3:::${env:TRANSFORMED_DATA_BUCKET}/*'
+
+plugins:
+  - serverless-dotenv-plugin
+
+# you can add packaging information here
+package:
+  individually: true
+  patterns:
+   - '!*.csv'
+   - '!main.py'
+   - '!*.json'
+   - '!dags/**'
+   - '!extract/**'
+   - '!transformed/**'
+   - '!node_modules/**'
+   - '!__pycache__/**'
+   - '!./*.py'
+   - '!__pycache__/**'
+   - '!Dockerfile'
+   - '!*.txt'
+   - helpers.py
+
+custom:
+  dotenv:
+    include:
+      - REGION
+      - REDSHIFT_IAM_ROLE
+      - TRANSFORMED_DATA_BUCKET
+      - DB_USER
+      - DB_PASSWORD
+      - DB_HOST
+      - DB_PORT
+      - DB_NAME
+
+functions:
+  transform_json_to_csv:
+    handler: handlers/transform_json_to_csv.handler
+    layers:
+      - arn:aws:lambda:${env:REGION}:${env:AWS_ACCOUNT_ID}:layer:customPandasLayer:4
+
+  load_csv_to_redshift:
+    handler: handlers/load_csv_to_redshift.handler
+    layers:
+      - arn:aws:lambda:${env:REGION}:${env:AWS_ACCOUNT_ID}:layer:customPandasLayer:4
+
+
