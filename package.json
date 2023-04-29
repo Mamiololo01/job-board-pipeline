@@ -1,0 +1,23 @@
+{
+  "name": "job-board-service-pipeline",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oluwasayodev/job-board-service-pipeline.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/oluwasayodev/job-board-service-pipeline/issues"
+  },
+  "homepage": "https://github.com/oluwasayodev/job-board-service-pipeline#readme",
+  "devDependencies": {
+    "serverless-dotenv-plugin": "^6.0.0"
+  }
+}
