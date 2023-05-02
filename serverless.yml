@@ -39,7 +39,11 @@ package:
    - '!__pycache__/**'
    - '!Dockerfile'
    - '!*.txt'
-   - helpers.py
+   - etl.py
+   - utils.py
+   - '!handlers/**'
+   - '!images/**'
+   - '!include/**'
 
 custom:
   dotenv:
@@ -55,12 +59,12 @@ custom:
 
 functions:
   transform_json_to_csv:
-    handler: handlers/transform_json_to_csv.handler
+    handler: etl.transform_data
     layers:
       - arn:aws:lambda:${env:REGION}:${env:AWS_ACCOUNT_ID}:layer:customPandasLayer:4
 
   load_csv_to_redshift:
-    handler: handlers/load_csv_to_redshift.handler
+    handler: etl.load_data
     layers:
       - arn:aws:lambda:${env:REGION}:${env:AWS_ACCOUNT_ID}:layer:customPandasLayer:4
 

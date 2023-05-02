@@ -3,33 +3,46 @@ from os import environ
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
 from airflow.providers.amazon.aws.operators.lambda_function import (
     AwsLambdaInvokeFunctionOperator,
 )
-from include import helpers
+import dotenv
+import etl
+import utils
 
+from include import utils, etl
+
+config = dotenv.dotenv_values()
+
+locations = ["US", "UK", "Canada"][0]
+jobs = ["Data Analyst", "Data Engineer"][0]
 
 default_args = {
     "owner": "oluwasayo",
-    "start_date": datetime(2023, 4, 20),
+    "start_date": datetime(2023, 4, 30),
 }
 
 with DAG(
-    "job_pipeline", default_args=default_args, schedule="15 17 * * *", catchup=False
+    "jobs_pipeline", default_args=default_args, schedule="00 14 * * *", catchup=True
 ) as dag:
     fetch_raw_jobs_data = PythonOperator(
         task_id="fetch_jobs_data",
-        python_callable=helpers.pull_job_data,
-        op_kwargs={"locations": ["UK"], "jobtitles": ["Data Analyst"]},
+        python_callable=etl.extract_job_data,
+        op_kwargs={
+            "locations": locations,
+            "jobtitles": jobs,
+        },
     )
 
     push_raw_jobs_data_to_s3 = PythonOperator(
         task_id="push_raw_jobs_data_to_s3",
-        python_callable=helpers.upload_file_to_s3,
+        python_callable=utils.upload_file_to_s3,
         op_kwargs={
             "filepath": "raw_jobs_data.json",
-            "bucket": environ.get("RAW_DATA_BUCKET"),
+            "bucket": environ.get(
+                "RAW_DATA_BUCKET",
+                config.get("RAW_DATA_BUCKET", environ.get("RAW_DATA_BUCKET")),
+            ),
         },
         do_xcom_push=True,
     )
@@ -47,9 +60,9 @@ with DAG(
 
     create_jobs_database_table = PythonOperator(
         task_id="create_jobs_table_if_not_exist",
-        python_callable=helpers.create_database_table,
+        python_callable=utils.create_database_table,
         op_kwargs={
-            "con": helpers.get_database_conn(),
+            "con": utils.get_database_conn(),
         },
     )
 

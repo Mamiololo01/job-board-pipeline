@@ -29,6 +29,7 @@ txt
 *.csv
 !package.json
 node_modules/
+handlers/
 
 .env
 .DS_Store # macOS specific ignore
@@ -38,3 +39,4 @@ astro
 
 plugins/
 tests/
+venv/

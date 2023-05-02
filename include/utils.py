@@ -13,43 +13,32 @@ from os import environ
 config = dotenv.dotenv_values()
 
 
-def pull_job_data(jobtitles, locations):
-    url = "https://jsearch.p.rapidapi.com/search"
-
-    params = {"page": "1", "num_pages": "1", "date_posted": "today"}
-    headers = {
-        "X-RapidAPI-Key": environ.get("X_RAPID_API_KEY"),
-        "X-RapidAPI-Host": environ.get("X_RAPID_API_HOST"),
-    }
-
-    print(headers)
-
-    queries = [
-        f"{title} in {location}" for location in locations for title in jobtitles
-    ]
-
-    results = []
+def pull_job_data(query):
     try:
-        for query in queries:
-            params["query"] = query
-            response = requests.get(url, headers=headers, params=params)
-            print(response.json()["data"])
-            results.extend(response.json()["data"])
+        url = "https://jsearch.p.rapidapi.com/search"
 
-        with open("raw_jobs_data.json", "w") as f:
-            json.dump(results, f, indent=4)
+        params = {"page": "1", "num_pages": "1", "date_posted": "today"}
+        headers = {
+            "X-RapidAPI-Key": config.get(
+                "X_RAPID_API_KEY", environ.get("X_RAPID_API_KEY")
+            ),
+            "X-RapidAPI-Host": config.get(
+                "X_RAPID_API_HOST", environ.get("X_RAPID_API_HOST")
+            ),
+        }
 
-    except KeyError as e:
-        # print("What is this: ", e)
-        raise KeyError("Could not load 'data' from response. API quote may have reached it's limit")
-    
-    # finally:
-    #     return results
+        params["query"] = query
+        response = requests.get(url, headers=headers, params=params)
+        return response.json()["data"]
+
+    except KeyError:
+        raise KeyError(
+            "Could not load 'data' from response. API quote may have reached it's limit"
+        )
 
 
 def upload_file_to_s3(filepath: Union[PosixPath, WindowsPath, str], bucket: str):
     s3 = boto3.client("s3")
-
     with open(filepath, "rb") as f:
         date = datetime.now().date().strftime("%Y/%m/%d")
         if type(filepath) == str:
@@ -62,7 +51,7 @@ def upload_file_to_s3(filepath: Union[PosixPath, WindowsPath, str], bucket: str)
     return {"Bucket": bucket, "Key": key}
 
 
-def get_file_from_s3(bucket, key, path_to_save="."):
+def get_file_from_s3(bucket, key, path_to_save="/tmp"):
     s3 = boto3.client("s3")
     path = Path(path_to_save)
     if not path.exists():
@@ -78,7 +67,9 @@ def get_file_from_s3(bucket, key, path_to_save="."):
     return str(filepath)
 
 
-def transform_data(filepath: Union[PosixPath, WindowsPath, str], path_to_save="."):
+def process_data(
+    filepath: Union[PosixPath, WindowsPath, str], path_to_save="/tmp", use_lambda=False
+):
     pandas_to_sql_type_map = {
         "object": "VARCHAR",
         "datetime64[ns, UTC]": "TIMESTAMPTZ",
@@ -130,19 +121,22 @@ def transform_data(filepath: Union[PosixPath, WindowsPath, str], path_to_save=".
         "jobs", schema=schema
     )
 
+    print("=" * 50)
+    print(df.head())
+
     return {
-        "output_path": Path(output_path).absolute(),
+        "output_path": str(Path(output_path).resolve()),
         "create_table_stmnt": create_table_stmnt,
     }
 
 
 def get_database_conn():
     creds = {
-        "dbname": config.get("DB_NAME"),
-        "user": config.get("DB_USER"),
-        "password": config.get("DB_PASSWORD"),
-        "host": config.get("DB_HOST"),
-        "port": config.get("DB_PORT"),
+        "dbname": config.get("DB_NAME", environ.get("DB_NAME")),
+        "user": config.get("DB_USER", environ.get("DB_USER")),
+        "password": config.get("DB_PASSWORD", environ.get("DB_PASSWORD")),
+        "host": config.get("DB_HOST", environ.get("DB_HOST")),
+        "port": config.get("DB_PORT", environ.get("DB_PORT")),
     }
     con = psycopg2.connect(**creds)
     return con
@@ -156,11 +150,12 @@ def generate_database_table_from_pandas_dtypes(name, schema: dict):
     """
 
 
-def create_database_table(create_statement = None, con: connection = None, **kwargs):
-    ti = kwargs['ti']
+def create_database_table(create_statement=None, con: connection = None, **kwargs):
+    ti = kwargs["ti"]
     if ti:
-        res = ti.xcom_pull(task_ids='transform_json_to_csv', key='return_value')
-        create_statement = res.get('create_table_stmnt')
+        results = ti.xcom_pull(task_ids="transform_json_to_csv", key="return_value")
+        results = json.loads(results)
+        create_statement = results.get("create_table_stmnt")
     con.set_session(autocommit=True)
     with con.cursor() as cursor:
         response = cursor.execute(create_statement)
@@ -168,20 +163,19 @@ def create_database_table(create_statement = None, con: connection = None, **kwa
 
 
 def load_csv_from_s3_to_redshift(bucket, key, region, iam_role, con: connection):
+    query = f"""
+    COPY jobs
+    FROM 's3://{bucket}/{key}'
+    DELIMITER ','
+    IGNOREHEADER 1
+    csv quote as '"'
+    REGION '{region}'
+    IAM_ROLE '{iam_role}'
+    timeformat AS 'auto';
+    """
     try:
         con.set_session(autocommit=True)
         with con.cursor() as cursor:
-            cursor.execute(
-                f"""
-            COPY jobs
-            FROM 's3://{bucket}/{key}'
-            DELIMITER ','
-            IGNOREHEADER 1
-            csv quote as '"'
-            REGION '{region}'
-            IAM_ROLE '{iam_role}'
-            timeformat AS 'auto';
-            """
-            )
+            cursor.execute(query)
     except Exception as e:
         print("An error occured: ", e)
