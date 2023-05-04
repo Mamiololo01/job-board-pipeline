@@ -23,7 +23,7 @@ python main.py
 ```
 and the second is by adding the `--use-lambda` flag as in
 ```bash
-python manage.py --use-lambda
+python main.py --use-lambda
 ```
 This will invoke the lambda functions on AWS. The lambda functions have been deployed using the serverless framework, hence the need for a `serverless.yml` file. More information will be provided on deploying the lambdas from your machine using the serverless cli commands. For now, the first method should work just fine (assuming all the above steps have been followed).
 
